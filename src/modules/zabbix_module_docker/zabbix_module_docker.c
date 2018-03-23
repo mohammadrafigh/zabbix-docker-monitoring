@@ -144,7 +144,7 @@ ZBX_METRIC      *zbx_module_item_list()
  *                                                                            *
  * Notes: https://docs.docker.com/reference/api/docker_remote_api/            *
  *        echo -e "GET /containers/json?all=1 HTTP/1.0\r\n" | \               *
- *        nc -U /var/run/docker.sock                                          *
+ *        nc -U /host/var/run/docker.sock                                          *
  ******************************************************************************/
 const char*  zbx_module_docker_socket_query(char *query, int stream)
 {
@@ -161,11 +161,11 @@ const char*  zbx_module_docker_socket_query(char *query, int stream)
             return empty;
         }
         address.sun_family = AF_UNIX;
-        zbx_strlcpy(address.sun_path, "/var/run/docker.sock", strlen("/var/run/docker.sock")+1);
+        zbx_strlcpy(address.sun_path, "/host/var/run/docker.sock", strlen("/host/var/run/docker.sock")+1);
         addr_length = sizeof(address.sun_family) + strlen(address.sun_path);
         if (connect(sock, (struct sockaddr *) &address, addr_length))
         {
-            zabbix_log(LOG_LEVEL_WARNING, "Cannot connect to standard docker's socket /var/run/docker.sock");
+            zabbix_log(LOG_LEVEL_WARNING, "Cannot connect to standard docker's socket /host/var/run/docker.sock");
             return empty;
         }
 
@@ -695,9 +695,9 @@ int     zbx_docker_dir_detect()
         FILE *fp;
         DIR  *dir;
 
-        if ((fp = fopen("/proc/mounts", "r")) == NULL)
+        if ((fp = fopen("/host/proc/mounts", "r")) == NULL)
         {
-            zabbix_log(LOG_LEVEL_WARNING, "Cannot open /proc/mounts: %s", zbx_strerror(errno));
+            zabbix_log(LOG_LEVEL_WARNING, "Cannot open /host/proc/mounts: %s", zbx_strerror(errno));
             return SYSINFO_RET_FAIL;
         }
 
@@ -1229,12 +1229,12 @@ int     zbx_module_docker_net(AGENT_REQUEST *request, AGENT_RESULT *result)
         }
         struct stat st = {0};
 
-        if(stat("/var/run/netns", &st) == -1)
+        if(stat("/host/var/run/netns", &st) == -1)
         {
-            if(mkdir("/var/run/netns", 0755) != 0)
+            if(mkdir("/host/var/run/netns", 0755) != 0)
             {
-                zabbix_log(LOG_LEVEL_ERR, "Cannot create /var/run/netns");
-                SET_MSG_RESULT(result, strdup("Cannot create /var/run/netns"));
+                zabbix_log(LOG_LEVEL_ERR, "Cannot create /host/var/run/netns");
+                SET_MSG_RESULT(result, strdup("Cannot create /host/var/run/netns"));
                 return SYSINFO_RET_FAIL;
             }
         }
@@ -1244,10 +1244,10 @@ int     zbx_module_docker_net(AGENT_REQUEST *request, AGENT_RESULT *result)
         metric = get_rparam(request, 2);
         const char* znetns_prefix = "zabbix_module_docker_";
 
-        size_t  filename_size = strlen("/var/run/netns/") + strlen(znetns_prefix) + strlen(container) + 2;
+        size_t  filename_size = strlen("/host/var/run/netns/") + strlen(znetns_prefix) + strlen(container) + 2;
         char    *filename = malloc(filename_size);
-        char    *netns = malloc(filename_size - strlen("/var/run/netns/") + 2);
-        zbx_strlcpy(filename, "/var/run/netns/", filename_size);
+        char    *netns = malloc(filename_size - strlen("/host/var/run/netns/") + 2);
+        zbx_strlcpy(filename, "/host/var/run/netns/", filename_size);
         zbx_strlcat(filename, znetns_prefix, filename_size);
         zbx_strlcpy(netns, znetns_prefix, filename_size);
         zbx_strlcat(filename, container, filename_size);
@@ -1309,9 +1309,9 @@ int     zbx_module_docker_net(AGENT_REQUEST *request, AGENT_RESULT *result)
             free(filename2);
 
             // soft link - new netns
-            filename_size = strlen("/proc//ns/net") + strlen(first_task) + 2;
+            filename_size = strlen("/host/proc//ns/net") + strlen(first_task) + 2;
             char* netns_source = malloc(filename_size);
-            zbx_strlcpy(netns_source, "/proc/", filename_size);
+            zbx_strlcpy(netns_source, "/host/proc/", filename_size);
             zbx_strlcat(netns_source, first_task, filename_size);
             free(first_task);
             zbx_strlcat(netns_source, "/ns/net", filename_size);
@@ -1477,9 +1477,9 @@ int     zbx_module_uninit()
         DIR             *dir;
         struct dirent   *d;
 
-        if (NULL == (dir = opendir("/var/run/netns")))
+        if (NULL == (dir = opendir("/host/var/run/netns")))
         {
-            zabbix_log(LOG_LEVEL_DEBUG, "/var/run/netns: %s", zbx_strerror(errno));
+            zabbix_log(LOG_LEVEL_DEBUG, "/host/var/run/netns: %s", zbx_strerror(errno));
             return ZBX_MODULE_OK;
         }
         char *file = NULL;
@@ -1492,7 +1492,7 @@ int     zbx_module_uninit()
             if ((strstr(d->d_name, znetns_prefix)) != NULL)
             {
                 file = NULL;
-                file = zbx_dsprintf(file, "/var/run/netns/%s", d->d_name);
+                file = zbx_dsprintf(file, "/host/var/run/netns/%s", d->d_name);
                 if(unlink(file) != 0)
                 {
                     zabbix_log(LOG_LEVEL_WARNING, "%s: %s", d->d_name, zbx_strerror(errno));
@@ -1501,7 +1501,7 @@ int     zbx_module_uninit()
         }
         if(0 != closedir(dir))
         {
-            zabbix_log(LOG_LEVEL_WARNING, "/var/run/netns/: %s", zbx_strerror(errno));
+            zabbix_log(LOG_LEVEL_WARNING, "/host/var/run/netns/: %s", zbx_strerror(errno));
         }
 
         free(stat_dir);
