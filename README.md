@@ -1,25 +1,16 @@
-[<img src="https://monitoringartist.github.io/managed-by-monitoringartist.png" alt="Managed by Monitoring Artist: DevOps / Docker / Kubernetes / AWS ECS / Zabbix / Zenoss / Terraform / Monitoring" align="right"/>](http://www.monitoringartist.com 'DevOps / Docker / Kubernetes / AWS ECS / Zabbix / Zenoss / Terraform / Monitoring')
+FORK NOTES
+==========
 
-# Zabbix Docker Monitoring [![Build Status](https://travis-ci.org/monitoringartist/zabbix-docker-monitoring.svg?branch=master)](https://travis-ci.org/monitoringartist/zabbix-docker-monitoring)
+in this fork I made some customizations to let the module work properly inside official Zabbix-Agent Ubuntu or CentOS docker image.
+
+IMPORTANT: you need to compile module using provided [Compilation](#compilation) guidelines before use.
+
+Refer to [Installation](#installation) for installation guidelines.
+
+---
 
 If you like or use this project, please provide feedback to author - Star it ★
 and [write what's missing for you](https://docs.google.com/forms/d/e/1FAIpQLSdYIokAyIMs2Qv19fzPxMWBubS9ESOYjJ2w_P222k5SuQuvoA/viewform).
-
-----
-
-**Overview of Monitoring Artist (dockerized) monitoring ecosystem:**
-
-- **[Dockbix XXL](https://hub.docker.com/r/monitoringartist/dockbix-xxl/)** - Zabbix server/proxy/UI/snmpd/java gateway with additional extensions
-- **[Dockbix agent XXL](https://hub.docker.com/r/monitoringartist/dockbix-agent-xxl-limited/)** - Zabbix agent with [Docker (Kubernetes/Mesos/Chronos/Marathon) monitoring](https://github.com/monitoringartist/zabbix-docker-monitoring) module
-- **[Zabbix templates](https://hub.docker.com/r/monitoringartist/zabbix-templates/)** - tiny Docker image for simple template deployment of selected Zabbix monitoring templates
-- **[Zabbix extension - all templates](https://hub.docker.com/r/monitoringartist/zabbix-ext-all-templates/)** - storage image for Dockbix XXL with 200+ [community templates](https://github.com/monitoringartist/zabbix-community-repos)
-- **[Kubernetized Zabbix](https://github.com/monitoringartist/kubernetes-zabbix)** - containerized Zabbix cluster based on Kubernetes
-- **[Grafana XXL](https://hub.docker.com/r/monitoringartist/grafana-xxl/)** - dockerized Grafana with all community plugins
-- **[Grafana dashboards](https://grafana.net/monitoringartist)** - Grafana dashboard collection for [AWS](https://github.com/monitoringartist/grafana-aws-cloudwatch-dashboards) and [Zabbix](https://github.com/monitoringartist/grafana-zabbix-dashboards)
-- **[Monitoring Analytics](https://hub.docker.com/r/monitoringartist/monitoring-analytics/)** - graphic analytic tool for Zabbix data from data scientists
-- **[Docker killer](https://hub.docker.com/r/monitoringartist/docker-killer/)** - Docker image for Docker stress and Docker orchestration testing
-
-----
 
 Monitoring of Docker container by using Zabbix. Available CPU, mem,
 blkio, net container metrics and some containers config details, e.g. IP, name, ...
@@ -29,27 +20,6 @@ Please feel free to test and provide feedback/open issue.
 The module is focused on performance, see section
 [Module vs. UserParameter script](#module-vs-userparameter-script).
 
-Module is available also as a part of different GitHub project - Docker image
-[dockbix-agent-xxl-limited](https://hub.docker.com/r/monitoringartist/dockbix-agent-xxl-limited/)
-(OS Linux host metrics and other selected metrics are supported as well). Quickstart:
-
-[![Dockbix Agent XXL Docker container](https://raw.githubusercontent.com/monitoringartist/dockbix-agent-xxl/master/doc/dockbix-agent-xxl.gif)](https://github.com/monitoringartist/dockbix-agent-xxl)
-
-```bash
-docker run \
-  --name=dockbix-agent-xxl \
-  --net=host \
-  --privileged \
-  -v /:/rootfs \
-  -v /var/run:/var/run \
-  --restart unless-stopped \
-  -e "ZA_Server=<ZABBIX SERVER IP/DNS NAME/IP RANGE>" \
-  -e "ZA_ServerActive=<ZABBIX SERVER IP/DNS NAME>" \
-  -d monitoringartist/dockbix-agent-xxl-limited:latest
-```
-
-For more information, visit [Dockbix agent XXL with Docker monitoring support](https://github.com/monitoringartist/dockbix-agent-xxl).
-
 Please donate to the author, so he can continue to publish other awesome projects
 for free:
 
@@ -57,10 +27,23 @@ for free:
 
 # Installation
 
-* Import provided template [Zabbix-Template-App-Docker.xml](https://raw.githubusercontent.com/monitoringartist/zabbix-docker-monitoring/master/template/Zabbix-Template-App-Docker.xml).
-* Configure your Zabbix agent(s) - load downloaded (see table below) or your
-[compiled](#compilation) `zabbix_module_docker.so`<br>
+1. Import provided template [Zabbix-Template-App-Docker.xml](https://raw.githubusercontent.com/monitoringartist/zabbix-docker-monitoring/master/template/Zabbix-Template-App-Docker.xml).
+2. Configure your Zabbix agent(s) - load your [compiled](#compilation) `zabbix_module_docker.so` by putting this file into `.../zbx_env/var/lib/zabbix/modules`<br>
 https://www.zabbix.com/documentation/3.0/manual/config/items/loadablemodules
+3. mount these volumes in agent container (docker-compose example):
+```YAML
+  volumes:
+   - /etc/localtime:/etc/localtime:ro
+   - /etc/timezone:/etc/timezone:ro
+   - /var/run:/host/var/run:ro # to use in module
+   - /proc:/host/proc:ro # to use in module
+   - /sys/fs/cgroup:/sys/fs/cgroup:ro # to use in module
+   - ./zbx_env/etc/zabbix/zabbix_agentd.d:/etc/zabbix/zabbix_agentd.d:ro
+   - ./zbx_env/var/lib/zabbix/modules:/var/lib/zabbix/modules:ro
+   - ./zbx_env/var/lib/zabbix/enc:/var/lib/zabbix/enc:ro
+   - ./zbx_env/var/lib/zabbix/ssh_keys:/var/lib/zabbix/ssh_keys:ro
+```
+4. add **zabbix** user to **docker** group with the same gid of docker group in host inside container using an entrypoint shell script then run default /usr/bin/docker-entrypoint.sh 
 
 Available templates:
 
@@ -77,29 +60,6 @@ docker run --rm \
   -e XXL_apipass=zabbix \
   monitoringartist/zabbix-templates
 ```
-
-Download latest build of `zabbix_module_docker.so` for Zabbix 3.4/3.2/3.0 agents:
-
-| OS           | Module for Zabbix 3.4 | Module for Zabbix 3.2 | Module for Zabbix 3.0 |
-| ------------ | :-------------------: | :-------------------: | :-------------------: |
-| Amazon Linux | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/amazonlinux/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/amazonlinux/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/amazonlinux/3.0/zabbix_module_docker.so) |
-| CentOS 7     | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos7/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos7/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos7/3.0/zabbix_module_docker.so) |
-| CentOS 6     | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos6/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos6/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos6/3.0/zabbix_module_docker.so) |
-| Debian 9     | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/debian9/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/debian9/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/debian9/3.0/zabbix_module_docker.so) |
-| Debian 8     | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/debian8/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/debian8/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/debian8/3.0/zabbix_module_docker.so) |
-| Debian 7     | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/debian7/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/debian7/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/debian7/3.0/zabbix_module_docker.so) |
-| Fedora 25    | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/fedora25/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/fedora25/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/fedora25/3.0/zabbix_module_docker.so) |
-| Fedora 24    | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/fedora25/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/fedora25/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/fedora24/3.0/zabbix_module_docker.so) |
-| openSUSE 42  | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/opensuse42/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/opensuse42/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/opensuse42/3.0/zabbix_module_docker.so) |
-| RHEL 7       | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos7/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos7/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos7/3.0/zabbix_module_docker.so) |
-| RHEL 6       | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos6/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos6/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/centos6/3.0/zabbix_module_docker.so) |
-| Ubuntu 17    | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/ubuntu17/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/ubuntu17/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/ubuntu17/3.0/zabbix_module_docker.so) |
-| Ubuntu 16    | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/ubuntu16/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/ubuntu16/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/ubuntu16/3.0/zabbix_module_docker.so) |
-| Ubuntu 14    | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/ubuntu14/3.4/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/ubuntu14/3.2/zabbix_module_docker.so) | [Download](https://github.com/monitoringartist/zabbix-docker-monitoring/raw/gh-pages/ubuntu14/3.0/zabbix_module_docker.so) |
-
-If the provided build doesn't work on your system, please see section [Compilation](#compilation).
-You can check [folder dockerfiles](https://github.com/monitoringartist/zabbix-docker-monitoring/tree/master/dockerfiles),
-where Dockerfiles for different OS/Zabbix versions can be customised.
 
 # Grafana dashboard
 
@@ -233,14 +193,14 @@ cd /usr/src/zabbix
 ./configure --enable-agent
 mkdir src/modules/zabbix_module_docker
 cd src/modules/zabbix_module_docker
-wget https://raw.githubusercontent.com/monitoringartist/zabbix-docker-monitoring/master/src/modules/zabbix_module_docker/zabbix_module_docker.c
-wget https://raw.githubusercontent.com/monitoringartist/zabbix-docker-monitoring/master/src/modules/zabbix_module_docker/Makefile
+wget https://raw.githubusercontent.com/mohammadrafigh/zabbix-docker-monitoring/master/src/modules/zabbix_module_docker/zabbix_module_docker.c
+wget https://raw.githubusercontent.com/mohammadrafigh/zabbix-docker-monitoring/master/src/modules/zabbix_module_docker/Makefile
 make
 ```
 
 The output will be the binary file (dynamically linked shared object library) `zabbix_module_docker.so`, which can be loaded by Zabbix agent.
 
-You can also use Docker for compilation. Example of Dockerfiles, which have been prepared for module compilation - https://github.com/monitoringartist/zabbix-docker-monitoring/tree/master/dockerfiles
+You can also use Docker for compilation. Example of Dockerfiles, which have been prepared for module compilation - https://github.com/mohammadrafigh/zabbix-docker-monitoring/tree/master/dockerfiles
 
 Troubleshooting
 ===============
@@ -256,229 +216,6 @@ Issues and feature requests
 
 Please use Github issue tracker.
 
-Module vs. UserParameter script
-===============================
 
-The module is ~10x quicker because it's compiled the binary code.
-I've used my project [Zabbix agent stress test](https://github.com/monitoringartist/zabbix-agent-stress-test)
-for performance tests.
 
-Part of config in zabbix_agentd.conf:
-
-    UserParameter=xdocker.cpu[*],grep $2 /cgroup/cpuacct/docker/$1/cpuacct.stat | awk '{print $$2}'
-    LoadModule=zabbix_module_docker.so
-
-Tests:
-
-    [root@dev zabbix-agent-stress-test]# ./zabbix-agent-stress-test.py -s 127.0.0.1 -k "xdocker.cpu[d5bf68ec1fb570d8ac3047226397edd8618eed14278ce035c98fbceef02d7730,system]" -t 20
-    Warning: you are starting more threads, than your system has available CPU cores (4)!
-    Starting 20 threads, host: 127.0.0.1:10050, key: xdocker.cpu[d5bf68ec1fb570d8ac3047226397edd8618eed14278ce035c98fbceef02d7730,system]
-    Success: 291    Errors: 0       Avg speed: 279.68 qps   Execution time: 1.00 sec
-    Success: 548    Errors: 0       Avg speed: 349.04 qps   Execution time: 2.00 sec
-    Success: 803    Errors: 0       Avg speed: 282.72 qps   Execution time: 3.00 sec
-    Success: 1060   Errors: 0       Avg speed: 209.31 qps   Execution time: 4.00 sec
-    Success: 1310   Errors: 0       Avg speed: 187.14 qps   Execution time: 5.00 sec
-    Success: 1570   Errors: 0       Avg speed: 178.80 qps   Execution time: 6.01 sec
-    Success: 1838   Errors: 0       Avg speed: 189.36 qps   Execution time: 7.01 sec
-    Success: 2106   Errors: 0       Avg speed: 225.68 qps   Execution time: 8.01 sec
-    Success: 2382   Errors: 0       Avg speed: 344.51 qps   Execution time: 9.01 sec
-    Success: 2638   Errors: 0       Avg speed: 327.88 qps   Execution time: 10.01 sec
-    Success: 2905   Errors: 0       Avg speed: 349.93 qps   Execution time: 11.01 sec
-    Success: 3181   Errors: 0       Avg speed: 352.23 qps   Execution time: 12.01 sec
-    Success: 3450   Errors: 0       Avg speed: 239.38 qps   Execution time: 13.01 sec
-    Success: 3678   Errors: 0       Avg speed: 209.88 qps   Execution time: 14.02 sec
-    Success: 3923   Errors: 0       Avg speed: 180.30 qps   Execution time: 15.02 sec
-    Success: 4178   Errors: 0       Avg speed: 201.58 qps   Execution time: 16.02 sec
-    Success: 4434   Errors: 0       Avg speed: 191.92 qps   Execution time: 17.02 sec
-    Success: 4696   Errors: 0       Avg speed: 332.06 qps   Execution time: 18.02 sec
-    Success: 4968   Errors: 0       Avg speed: 325.55 qps   Execution time: 19.02 sec
-    Success: 5237   Errors: 0       Avg speed: 325.61 qps   Execution time: 20.02 sec
-    ^C
-    Success: 5358   Errors: 0       Avg rate: 192.56 qps    Execution time: 20.53 sec
-    Avg rate based on total execution time and success connections: 261.02 qps
-
-    [root@dev zabbix-agent-stress-test]# ./zabbix-agent-stress-test.py -s 127.0.0.1 -k "docker.cpu[d5bf68ec1fb570d8ac3047226397edd8618eed14278ce035c98fbceef02d7730,system]" -t 20
-    Warning: you are starting more threads, than your system has available CPU cores (4)!
-    Starting 20 threads, host: 127.0.0.1:10050, key: docker.cpu[d5bf68ec1fb570d8ac3047226397edd8618eed14278ce035c98fbceef02d7730,system]
-    Success: 2828   Errors: 0       Avg speed: 2943.98 qps  Execution time: 1.00 sec
-    Success: 5095   Errors: 0       Avg speed: 1975.77 qps  Execution time: 2.01 sec
-    Success: 7623   Errors: 0       Avg speed: 2574.55 qps  Execution time: 3.01 sec
-    Success: 10098  Errors: 0       Avg speed: 4720.20 qps  Execution time: 4.02 sec
-    Success: 12566  Errors: 0       Avg speed: 3423.56 qps  Execution time: 5.02 sec
-    Success: 14706  Errors: 0       Avg speed: 2397.01 qps  Execution time: 6.03 sec
-    Success: 17128  Errors: 0       Avg speed: 903.63 qps   Execution time: 7.05 sec
-    Success: 19520  Errors: 0       Avg speed: 2663.53 qps  Execution time: 8.05 sec
-    Success: 21899  Errors: 0       Avg speed: 1516.36 qps  Execution time: 9.07 sec
-    Success: 24219  Errors: 0       Avg speed: 3570.47 qps  Execution time: 10.07 sec
-    Success: 26676  Errors: 0       Avg speed: 1204.58 qps  Execution time: 11.08 sec
-    Success: 29162  Errors: 0       Avg speed: 2719.87 qps  Execution time: 12.08 sec
-    Success: 31671  Errors: 0       Avg speed: 2265.67 qps  Execution time: 13.08 sec
-    Success: 34186  Errors: 0       Avg speed: 3490.64 qps  Execution time: 14.08 sec
-    Success: 36749  Errors: 0       Avg speed: 2094.59 qps  Execution time: 15.09 sec
-    Success: 39047  Errors: 0       Avg speed: 3213.35 qps  Execution time: 16.09 sec
-    Success: 41361  Errors: 0       Avg speed: 3171.67 qps  Execution time: 17.09 sec
-    Success: 43739  Errors: 0       Avg speed: 3946.53 qps  Execution time: 18.09 sec
-    Success: 46100  Errors: 0       Avg speed: 1308.88 qps  Execution time: 19.09 sec
-    Success: 48556  Errors: 0       Avg speed: 2663.52 qps  Execution time: 20.09 sec
-    ^C
-    Success: 49684  Errors: 0       Avg rate: 2673.85 qps   Execution time: 20.52 sec
-    Avg rate based on total execution time and success connections: 2420.70 qps
-
-Results of 20s stress test:
-
-| StartAgent value | Module qps | UserParameter script qps |
-| ---------------- | ---------- | ------------------------ |
-| 3 | 2420.70 | 261.02 |
-| 10 | 2612.20 | 332.62 |
-| 20 | 2487.93 | 348.52 |
-
-Discovery test:
-
-Part of config in zabbix_agentd.conf:
-
-    UserParameter=xdocker.discovery,/etc/zabbix/scripts/container_discover.sh
-    LoadModule=zabbix_module_docker.so
-
-Shell implementation container_discover.sh:
-
-Test with 237 running containers:
-
-    [root@dev ~]# docker info
-    Containers: 237
-    Images: 121
-    Storage Driver: btrfs
-    Execution Driver: native-0.2
-    Kernel Version: 3.10.0-229.el7.x86_64
-    Operating System: Red Hat Enterprise Linux Server 7.1 (Maipo)
-    CPUs: 10
-    Total Memory: 62.76 GiB
-    Name: dev.local
-    ID: AOAM:BO3G:5MCE:5FMM:IWKP:NPM4:PRKV:ZZ34:BYFL:XGAV:SRNJ:LKDH
-    Username: username
-    Registry: [https://index.docker.io/v1/]
-    [root@dev ~]# time zabbix_get -s 127.0.0.1 -k docker.discovery > /dev/null
-
-    real    0m0.112s
-    user    0m0.000s
-    sys     0m0.003s
-    [root@dev ~]# time zabbix_get -s 127.0.0.1 -k xdocker.discovery > /dev/null
-
-    real    0m5.856s
-    user    0m0.000s
-    sys     0m0.002s
-    [root@dev ~]# ./zabbix-agent-stress-test.py -s 127.0.0.1 -k xdocker.discovery
-    Starting 1 threads, host: 127.0.0.1:10050, key: xdocker.discovery
-    Success: 0      Errors: 0       Avg rate: 0.00 qps      Execution time: 1.00 sec
-    Success: 0      Errors: 0       Avg rate: 0.00 qps      Execution time: 2.00 sec
-    Success: 0      Errors: 0       Avg rate: 0.00 qps      Execution time: 3.02 sec
-    Success: 0      Errors: 0       Avg rate: 0.00 qps      Execution time: 4.02 sec
-    Success: 0      Errors: 0       Avg rate: 0.00 qps      Execution time: 5.02 sec
-    Success: 1      Errors: 0       Avg rate: 0.10 qps      Execution time: 6.02 sec
-    Success: 1      Errors: 0       Avg rate: 0.10 qps      Execution time: 7.02 sec
-    Success: 1      Errors: 0       Avg rate: 0.10 qps      Execution time: 8.02 sec
-    Success: 1      Errors: 0       Avg rate: 0.10 qps      Execution time: 9.02 sec
-    Success: 1      Errors: 0       Avg rate: 0.10 qps      Execution time: 10.02 sec
-    Success: 2      Errors: 0       Avg rate: 0.14 qps      Execution time: 11.02 sec
-    Success: 2      Errors: 0       Avg rate: 0.14 qps      Execution time: 12.03 sec
-    Success: 2      Errors: 0       Avg rate: 0.14 qps      Execution time: 13.03 sec
-    Success: 2      Errors: 0       Avg rate: 0.14 qps      Execution time: 14.03 sec
-    Success: 2      Errors: 0       Avg rate: 0.14 qps      Execution time: 15.03 sec
-    Success: 3      Errors: 0       Avg rate: 0.16 qps      Execution time: 16.03 sec
-    Success: 3      Errors: 0       Avg rate: 0.16 qps      Execution time: 17.03 sec
-    Success: 3      Errors: 0       Avg rate: 0.16 qps      Execution time: 18.03 sec
-    Success: 3      Errors: 0       Avg rate: 0.16 qps      Execution time: 19.03 sec
-    Success: 3      Errors: 0       Avg rate: 0.16 qps      Execution time: 20.03 sec
-    Success: 3      Errors: 0       Avg rate: 0.16 qps      Execution time: 21.04 sec
-    Success: 4      Errors: 0       Avg rate: 0.17 qps      Execution time: 22.04 sec
-    Success: 4      Errors: 0       Avg rate: 0.17 qps      Execution time: 23.04 sec
-    Success: 4      Errors: 0       Avg rate: 0.17 qps      Execution time: 24.04 sec
-    Success: 4      Errors: 0       Avg rate: 0.17 qps      Execution time: 25.05 sec
-    Success: 5      Errors: 0       Avg rate: 0.20 qps      Execution time: 26.05 sec
-    Success: 5      Errors: 0       Avg rate: 0.20 qps      Execution time: 27.05 sec
-    Success: 5      Errors: 0       Avg rate: 0.20 qps      Execution time: 28.05 sec
-    Success: 5      Errors: 0       Avg rate: 0.20 qps      Execution time: 29.05 sec
-    Success: 5      Errors: 0       Avg rate: 0.20 qps      Execution time: 30.05 sec
-    Success: 5      Errors: 0       Avg rate: 0.20 qps      Execution time: 31.05 sec
-    ^C
-    Success: 5      Errors: 0       Avg rate: 0.20 qps      Execution time: 31.35 sec
-    Avg rate based on total execution time and success connections: 0.16 qps
-    [root@dev ~]# ./zabbix-agent-stress-test.py -s 127.0.0.1 -k docker.discovery
-    Starting 1 threads, host: 127.0.0.1:10050, key: docker.discovery
-    Success: 5      Errors: 0       Avg rate: 6.26 qps      Execution time: 1.00 sec
-    Success: 5      Errors: 0       Avg rate: 6.26 qps      Execution time: 2.00 sec
-    Success: 12     Errors: 0       Avg rate: 7.45 qps      Execution time: 3.00 sec
-    Success: 20     Errors: 0       Avg rate: 6.77 qps      Execution time: 4.00 sec
-    Success: 28     Errors: 0       Avg rate: 7.82 qps      Execution time: 5.00 sec
-    Success: 36     Errors: 0       Avg rate: 7.21 qps      Execution time: 6.01 sec
-    Success: 43     Errors: 0       Avg rate: 10.22 qps     Execution time: 7.01 sec
-    Success: 43     Errors: 0       Avg rate: 10.22 qps     Execution time: 8.01 sec
-    Success: 50     Errors: 0       Avg rate: 6.79 qps      Execution time: 9.01 sec
-    Success: 57     Errors: 0       Avg rate: 6.11 qps      Execution time: 10.01 sec
-    Success: 66     Errors: 0       Avg rate: 8.50 qps      Execution time: 11.01 sec
-    Success: 73     Errors: 0       Avg rate: 6.51 qps      Execution time: 12.01 sec
-    Success: 81     Errors: 0       Avg rate: 7.18 qps      Execution time: 13.01 sec
-    Success: 82     Errors: 0       Avg rate: 7.85 qps      Execution time: 14.01 sec
-    Success: 87     Errors: 0       Avg rate: 6.54 qps      Execution time: 15.02 sec
-    Success: 95     Errors: 0       Avg rate: 7.84 qps      Execution time: 16.02 sec
-    Success: 103    Errors: 0       Avg rate: 9.24 qps      Execution time: 17.02 sec
-    Success: 111    Errors: 0       Avg rate: 9.94 qps      Execution time: 18.02 sec
-    Success: 119    Errors: 0       Avg rate: 7.63 qps      Execution time: 19.02 sec
-    Success: 120    Errors: 0       Avg rate: 6.70 qps      Execution time: 20.12 sec
-    Success: 121    Errors: 0       Avg rate: 3.61 qps      Execution time: 21.12 sec
-    Success: 128    Errors: 0       Avg rate: 8.46 qps      Execution time: 22.12 sec
-    Success: 136    Errors: 0       Avg rate: 7.63 qps      Execution time: 23.12 sec
-    Success: 144    Errors: 0       Avg rate: 6.21 qps      Execution time: 24.12 sec
-    Success: 150    Errors: 0       Avg rate: 6.89 qps      Execution time: 25.12 sec
-    Success: 157    Errors: 0       Avg rate: 10.87 qps     Execution time: 26.18 sec
-    Success: 160    Errors: 0       Avg rate: 7.52 qps      Execution time: 27.18 sec
-    Success: 168    Errors: 0       Avg rate: 9.81 qps      Execution time: 28.18 sec
-    Success: 174    Errors: 0       Avg rate: 6.69 qps      Execution time: 29.18 sec
-    Success: 181    Errors: 0       Avg rate: 6.35 qps      Execution time: 30.18 sec
-    Success: 188    Errors: 0       Avg rate: 7.64 qps      Execution time: 31.19 sec
-    ^C
-    Success: 193    Errors: 0       Avg rate: 8.83 qps      Execution time: 31.79 sec
-    Avg rate based on total execution time and success connections: 6.07 qps
-
-How it works
-============
-
-See https://blog.docker.com/2013/10/gathering-lxc-docker-containers-metrics/
-Metrics for containers are read from cgroup file system.
-[Docker API](https://docs.docker.com/reference/api/docker_remote_api) is used
-for discovering and some keys. However root or docker permissions are required
-for communication with Docker via unix socket. You can test API also in your
-command line:
-
-```bash
-echo -e "GET /containers/json?all=0 HTTP/1.0\r\n" | nc -U /var/run/docker.sock
-# or if you have curl 7.40+
-curl --unix-socket /var/run/docker.sock --no-buffer -XGET v1.24/containers/json?all=0
-```
-
-# Recommended docs
-
-- https://docs.docker.com/engine/admin/runmetrics/
-- https://www.kernel.org/doc/Documentation/cgroup-v1/blkio-controller.txt
-- https://www.kernel.org/doc/Documentation/cgroup-v1/memory.txt
-- https://www.kernel.org/doc/Documentation/cgroup-v1/cpuacct.txt
-- https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Resource_Management_Guide/index.html
-
-# Contributors
-
-Thank you to all [project contributors](https://github.com/monitoringartist/zabbix-docker-monitoring/graphs/contributors).
-
-# Author
-
-[Devops Monitoring Expert](http://www.jangaraj.com 'DevOps / Docker / Kubernetes / AWS ECS / Google GCP / Zabbix / Zenoss / Terraform / Monitoring'),
-who loves monitoring systems and cutting/bleeding edge technologies: Docker,
-Kubernetes, ECS, AWS, Google GCP, Terraform, Lambda, Zabbix, Grafana, Elasticsearch,
-Kibana, Prometheus, Sysdig,...
-
-Summary:
-* 2000+ [GitHub](https://github.com/monitoringartist/) stars
-* 10 000+ [Grafana dashboard](https://grafana.net/monitoringartist) downloads
-* 1 000 000+ [Docker image](https://hub.docker.com/u/monitoringartist/) pulls
-
-Professional devops / monitoring / consulting services:
-
-[![Monitoring Artist](http://monitoringartist.com/img/github-monitoring-artist-logo.jpg)](http://www.monitoringartist.com 'DevOps / Docker / Kubernetes / AWS ECS / Google GCP / Zabbix / Zenoss / Terraform / Monitoring')
+**for more info refer to main repository.**
